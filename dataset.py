@@ -22,4 +22,6 @@ class Dataset():
             lines = self.file.readlines()
             data = [line.split(" ") for line in lines]
             return data
+        self.file.close()
+
 
