@@ -1,7 +1,8 @@
 # apriori-and-sons
 
-Install Spark
-Install conda
+- Install Spark
+- Install conda
+- Add Hadoop native libs
 
 
 ```bash
