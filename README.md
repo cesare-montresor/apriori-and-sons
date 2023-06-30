@@ -1,12 +1,19 @@
 # apriori-and-sons
 
+Install Spark
+Install conda
 
+
+```bash
+conda create --name <envname> --file requirements.txt
+```
 
 
 This repo contains several variants of the apriori and son algorithms
 ```bash
 sudo systemctl enable ssh    
-sudo apt install openssh-server     
+sudo apt install openssh-server
+sudo apt install screen`
 ```
 
 
