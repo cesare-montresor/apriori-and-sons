@@ -41,12 +41,13 @@ def pcy_erode_rdd(transactions: pyspark.RDD, min_support: float, num_partitions:
 
     validationSet = frequentSets.map(lambda item: item[0]).collect()
     supportSet = [(item,) for item in validationSet]
-    candidateSize = 2
+    candidateSize = 1
 
     while len(validationSet)>0:
+        candidateSize += 1
         print(f"candidateSize:", candidateSize)
         print(f"supportSets:", validationSet)
-        print("transactions size", transactions.count() )
+        #print("transactions size", transactions.count() )
         transactions = reduceTransactions(transactions, validationSet, candidateSize)
 
         pairsCount = transactions.flatMap(lambda transaction: findPairs(transaction, candidateSize))
@@ -54,12 +55,10 @@ def pcy_erode_rdd(transactions: pyspark.RDD, min_support: float, num_partitions:
         pairsCount = pairsCount.filter(lambda item: item[1] > min_frequency)
 
         frequentSets = frequentSets.union(pairsCount)
-        print("pairsCount:", pairsCount.count())
+        #print("pairsCount:", pairsCount.count())
         validationSet = pairsCount.flatMap(lambda item:item[0]).distinct().collect()
 
-        candidateSize += 1
-
-    print("transactions size", transactions.count())
+    #print("transactions size", transactions.count())
 
     return frequentSets
 def reduceTransactions(transactions: pyspark.RDD, validationSet: list | tuple, candidateSize:int)->pyspark.RDD:

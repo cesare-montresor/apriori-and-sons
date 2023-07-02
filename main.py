@@ -1,3 +1,4 @@
+import math
 import os
 import re
 from algorithms.utils import *
@@ -13,11 +14,11 @@ result_path = f'{base_path}/result/'
 logs_path = f'{base_path}/result/logs/'
 tasks_path = f"{result_path}tasks_{session_id}.sh"
 index_path = f"{result_path}index_{session_id}.csv"
+stats_path = f"{result_path}dataset_stats.csv"
 
 maxTimeout = 5 * 60 # max timeout, 5 minutes, for low support values
 lineTimeout = 0.1 # scale overall timeout with the size of the dataset
 
-supports = [0.5, 0.3] # [0.7, 0.5, 0.3]
 algos = [
     {"algorithm_name": "son_apriori", "algorithm": son_rdd},
     {"algorithm_name": "pcy", "algorithm": pcy_rdd},
@@ -26,12 +27,21 @@ algos = [
     {"algorithm_name": "apriori_spark", "algorithm": apriori_rdd},
 ]
 
+datasets = [
+    {"name":"mushroom", "supports":[0.7, 0.5, 0.3]},
+    {"name":"retail", "supports":[0.05, 0.005]}, # [0.1, 0.05, 0.005]
+    {"name":"50K10", "supports":[0.06, 0.03, 0.01]},
+    {"name":"25K40", "supports":[0.01, 0.001]}, #[0.1, 0.01, 0.001]
+    {"name":"100K10", "supports":[0.06, 0.03, 0.01]},
+    {"name":"100K40", "supports":[0.2, 0.1, 0.05]},
+]
 
+csv_div = ','
 
 def main():
     command = sys.argv.pop(0)
     args = sys.argv if len(sys.argv) > 0 else ['tasklist']
-    print(sys.argv)
+    # print(sys.argv)
 
     os.makedirs(logs_path, exist_ok=True)
     os.makedirs(result_path, exist_ok=True)
@@ -41,28 +51,101 @@ def main():
     if action == 'all':
         createTaskList()
         os.execl("/bin/bash", tasks_path,"&")
-    if action == 'tasklist':
+    elif action == 'tasklist':
         createTaskList()
     elif action == 'runtask':
-        if len(args)!=6: print("Usage:\n main.py task_name algo_name min_support data_path result_path index_path")
+        if len(args) != 6: print("Usage:\n main.py runtask <task_name> <algo_name> <min_support> <data_path> <result_path> <index_path>")
         runTaskCli(*args)
+    elif action == 'datastats':
+        dataStats(dataset_path, stats_path)
+    else:
+        print("Usage:\npython main.py [all|tasklist|runtask|datastats|help] (Default: tasklist)")
+
+
+def dataStats(data_path, output_path):
+
+    lines = ["Name, Path, Size, Num lines, Num items, min_freq, max_freq, avg_freq, min_items, max_items, avg_items, hist_x_freq_txt, hist_y_freq_txt, hist_x_items_txt, hist_y_items_txt"]
+    for dataset in datasets:
+        name = dataset['name']
+        path = dataset_path+name+".txt"
+        print(name, path)
+
+        # ================================================================ COUNT ================================================================
+        filesize = os.path.getsize(path)
+        num_lines = 0
+        unique_items = {}
+        lines_lengths = {}
+        with open(path, 'r') as fp:
+            for row_num, row in enumerate(fp):
+                items = row.strip().split(' ')
+                item_cnt = len(items)
+                if item_cnt not in lines_lengths: lines_lengths[item_cnt] = 0
+                lines_lengths[item_cnt] += 1
+                for item in items:
+                    if item not in unique_items: unique_items[item] = 0
+                    unique_items[item] += 1
+                num_lines += 1
+
+        num_unique_items = len(unique_items)
+
+        # ================================================================ FREQUENCY ================================================================
+        hist_freq_size = 20
+
+        max_freq = max(unique_items.values())
+        min_freq = min(unique_items.values())
+        avg_freq = sum(unique_items.values()) / len(unique_items)
+
+        hist_freq_width = (max_freq // hist_freq_size) + 1
+
+        stats_freq = [0] * hist_freq_size
+        for item_freq in unique_items.values():
+            idx = item_freq // hist_freq_width
+            stats_freq[idx] += 1
+
+        hist_x_freq_txt = "|".join([str(int(item * hist_freq_width)) for item in range(hist_freq_size)])
+        hist_y_freq_txt = "|".join([str(item) for item in stats_freq])
+
+        # ================================================================ TRANSACTION ================================================================
+        hist_items_size = 20
+
+        max_items = max(lines_lengths.keys())
+        min_items = min(lines_lengths.keys())
+        avg_items = sum([length * cnt for length, cnt in lines_lengths.items()]) / num_lines
+
+        hist_items_width = ( max_items // hist_items_size) + 1
+        stats_items = [0] * hist_items_size
+        for item_count, num_occurences in lines_lengths.items():
+            idx = item_count // hist_items_width
+            stats_items[idx] += num_occurences
+
+        hist_x_items_txt = "|".join([str(int(line * hist_items_width)) for line in range(hist_items_size)])
+        hist_y_items_txt = "|".join([str(item) for item in stats_items])
+
+
+        # ================================================================ WRITE ================================================================
+
+        line = (name, path, filesize, num_lines, num_unique_items, min_freq, max_freq, avg_freq, min_items, max_items, avg_items, hist_x_freq_txt, hist_y_freq_txt, hist_x_items_txt, hist_y_items_txt)
+        line = csv_div.join([str(item) for item in line])
+        lines.append(line)
+    content = '\n'.join(lines)
+    with open(stats_path, 'w') as f: f.write(content)
+
 
 # run
 def createTaskList():
-    all_files = os.listdir(dataset_path)
-    datasets = list(filter(lambda filename: str(filename).endswith('.txt'), all_files))
-    datasets = list(map(lambda filename: os.path.splitext(filename)[0], datasets))
 
     tasks = []
     for algo in algos:
         for dataset in datasets:
+            dataset_name = dataset['name']
+            supports = dataset['supports']
             for min_support in supports:
-                sup_slug = int(min_support * 100)
-                task_name = f'{algo["algorithm_name"]}_{dataset}_{sup_slug}'
+                sup_slug = str(int(min_support * 1000)).rjust(4, '0')
+                task_name = f'{algo["algorithm_name"]}-{dataset_name}-{sup_slug}'
                 task = {
                     'task_name': task_name,
-                    'dataset': dataset,
-                    'data_path': f'{dataset_path}{dataset}.txt',
+                    'dataset': dataset_name,
+                    'data_path': f'{dataset_path}{dataset_name}.txt',
                     'result_path': f'{result_path}{task_name}/',
                     'min_support': min_support,
                     **algo
@@ -77,7 +160,7 @@ def runTaskCli(name, algorithm_name, min_support, data_path, output_path, index_
         print(f"ERROR: algorithm {algorithm_name} NOT FOUND")
         return False
     algorithm = algorithm[0]['algorithm']
-
+    dataset_name = os.path.splitext(data_path.split("/")[-1])[0]
     params = {
         'task_name': name,
         'algorithm': algorithm,
@@ -90,13 +173,14 @@ def runTaskCli(name, algorithm_name, min_support, data_path, output_path, index_
     print("TASK:", name)
     outcome, num_sets, total_time = runTask(**params)
     print("TASK:", outcome, num_sets, total_time)
-    result = (name, algorithm_name, data_path, min_support, output_path, outcome, num_sets, total_time)
+    sys.stdout.flush()
+    result = (name, algorithm_name, dataset_name, data_path, min_support, output_path, outcome, num_sets, total_time)
     writeResult(index_fullpath, result)
     return True
 
 def writeResult(index_path, results):
     line = map(lambda part: f'"{part}"', results)
-    line = ";".join(line)+"\n"
+    line = csv_div.join(line)+"\n"
     with open(index_path,'a') as f: f.write(line)
 
 

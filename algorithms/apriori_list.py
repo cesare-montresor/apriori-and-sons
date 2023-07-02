@@ -55,7 +55,7 @@ def apriori_list(transactions: list | tuple, min_support: float) -> tuple:
         # filter valid sets against transactions
         existingSets = product(extendedSets, transactions)
         existingSets = tuple(filter(lambda item: set(item[0]).issubset(item[1]), existingSets))  # not all sets exist as transaction
-        existingSets = tuple(map(lambda item: item[0], existingSets))  #
+        existingSets = tuple(map(lambda item: item[0], existingSets))
 
         # count occurrences
         itemSupport = filterMinFrequency(existingSets, min_frequency)

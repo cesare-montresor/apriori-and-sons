@@ -42,25 +42,24 @@ def pcy_rdd(transactions: pyspark.RDD, min_support: float, num_partitions: int |
     print(frequentSets.count())
 
     validationSet = frequentSets.map(lambda item: item[0]).collect()
-    candidateSize = 2
+    candidateSize = 1
 
     while len(validationSet)>0:
+        candidateSize += 1
         print(f"candidateSize:", candidateSize)
         print(f"validationSet:", validationSet)
 
         pairsCount = transactions.flatMap(lambda transaction: findPairs(transaction, validationSet, candidateSize))
+
         pairsCount = pairsCount.reduceByKey(lambda x, y: x + y)
         pairsCount = pairsCount.filter(lambda item: item[1] > min_frequency)
-
         frequentSets = frequentSets.union(pairsCount)
         validationSet = pairsCount.flatMap(lambda item:item[0]).distinct().collect()
-
-        candidateSize += 1
-
+    
     return frequentSets
 
 def findPairs(transaction:list|tuple, validationSet:tuple|list, candidateSize:int) -> tuple:
-    if len(transaction) < candidateSize: return None
+    if len(transaction) < candidateSize: return tuple()
     validItems = set(filter(lambda item: item in validationSet, transaction))
     if len(validItems) < candidateSize: return tuple()
 

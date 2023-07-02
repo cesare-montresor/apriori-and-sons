@@ -3,6 +3,7 @@ import pyspark
 import shutil
 import signal
 import time
+import sys
 
 
 class TimeoutException(Exception): pass
@@ -17,9 +18,13 @@ def print(*args):
     args = map(lambda x: x.collect() if isinstance(x, pyspark.RDD) else x, args)
     __builtins__['print'](*args)
 
-def load(sc, data_path, sep=' ') -> pyspark.RDD:
+def load(sc, data_path, sep=' ', useInt=True) -> pyspark.RDD:
     itemSets = sc.textFile(data_path)
-    return itemSets.map(lambda line: line.strip().split(sep))
+    itemSets = itemSets.map(lambda line: line.strip().split(sep))
+    if useInt:
+        itemSets = itemSets.map(lambda line: tuple(map(lambda item: int(item), line)))
+    return itemSets
+
 
 def save(data, output_path):
     if os.path.exists(output_path): shutil.rmtree(output_path)
@@ -38,6 +43,7 @@ def runTask(task_name:str, algorithm, data_path:str, min_support:float, result_p
     print("=" * 80)
     print(" " * ((80-len(task_name))//2) + task_name)
     print("=" * 80)
+    sys.stdout.flush()
 
 
     # load data
@@ -83,7 +89,8 @@ def runTask(task_name:str, algorithm, data_path:str, min_support:float, result_p
     print(status)
     print(num_sets)
     print(total_time)
-
+    print("-----------------------------------")
+    sys.stdout.flush()
 
     return status, num_sets, total_time
 
