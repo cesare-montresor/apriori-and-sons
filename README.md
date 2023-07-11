@@ -1,6 +1,7 @@
 # apriori-and-sons
-This repo contains several variants of the apriori and son algorithms
-Results of experiments run up to this point, can be found inside the results_.zip in the main folder.
+This repo contains several variants of the apriori and son algorithms     
+
+*NOTE: Results of experiments run up to this point, can be found inside the results_.zip in the main folder.*     
 
 
 # Usage 
